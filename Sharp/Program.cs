@@ -17,12 +17,17 @@ namespace Sharp
     /// SharpDX MiniCube Direct3D 11 Sample
     /// </summary>
     /// 
-    struct CBuffer
+    struct CBufferPerObject
     {
         public Matrix world;
-        public Matrix viewProj;
         public Matrix worldIT;
     };
+
+    struct CBufferPerFrame
+    {
+        public Matrix viewProj;
+        public Vector4 eyePosition;
+    }
     internal static class Program
     {
         //      [STAThread]
@@ -64,7 +69,7 @@ namespace Sharp
             var vertexShaderByteCode = ShaderBytecode.CompileFromFile("shader.fx", "VS", "vs_4_0", ShaderFlags.Debug);
             var vertexShader = new VertexShader(device, vertexShaderByteCode);
 
-            var pixelShaderByteCode = ShaderBytecode.CompileFromFile("shader.fx", "PS", "ps_4_0",ShaderFlags.Debug|ShaderFlags.SkipOptimization);
+            var pixelShaderByteCode = ShaderBytecode.CompileFromFile("shader.fx", "PS", "ps_4_0", ShaderFlags.Debug | ShaderFlags.SkipOptimization);
             var pixelShader = new PixelShader(device, pixelShaderByteCode);
 
             var signature = ShaderSignature.GetInputSignature(vertexShaderByteCode);
@@ -122,24 +127,29 @@ namespace Sharp
                                       new Vector3( 1.0f,  1.0f,  1.0f), new Vector3(0.0f, 1.0f, 1.0f),  new Vector3(-1,0,0),
                             });
 
-            
 
-            // Create Constant Buffer
-            var contantBuffer = new Buffer(device, Utilities.SizeOf<CBuffer>(), ResourceUsage.Default, BindFlags.ConstantBuffer, CpuAccessFlags.None, ResourceOptionFlags.None, 0);
-            CBuffer cBuffer = new CBuffer();
+
+            // Create Constant Buffers
+            var constantBufferPerFrame = new Buffer(device, Utilities.SizeOf<CBufferPerFrame>(), ResourceUsage.Default, BindFlags.ConstantBuffer, CpuAccessFlags.None, ResourceOptionFlags.None, 0);
+            CBufferPerFrame cBufferPerFrame = new CBufferPerFrame();
+
+            var constantBufferPerObject = new Buffer(device, Utilities.SizeOf<CBufferPerObject>(), ResourceUsage.Default, BindFlags.ConstantBuffer, CpuAccessFlags.None, ResourceOptionFlags.None, 0);
+            CBufferPerObject cBufferPerObject = new CBufferPerObject();
 
             // Prepare All the stages
             context.InputAssembler.InputLayout = layout;
             context.InputAssembler.PrimitiveTopology = PrimitiveTopology.TriangleList;
             context.InputAssembler.SetVertexBuffers(0, new VertexBufferBinding(vertices, Utilities.SizeOf<Vector3>() * 3, 0));
-            context.VertexShader.SetConstantBuffer(0, contantBuffer);
+            context.VertexShader.SetConstantBuffer(0, constantBufferPerFrame);
+            context.VertexShader.SetConstantBuffer(1, constantBufferPerObject);
             context.VertexShader.Set(vertexShader);
             context.PixelShader.Set(pixelShader);
 
-            
+
 
             // Prepare matrices
-            var view = Matrix.LookAtRH(new Vector3(0, 3, -5), new Vector3(0, 0, 0), Vector3.UnitY);
+            var eyePosition = new Vector4(0, 3, -5, 0);
+            var view = Matrix.LookAtRH(new Vector3(eyePosition.X,eyePosition.Y, eyePosition.Z), new Vector3(0, 0, 0), Vector3.UnitY);
             Matrix proj = Matrix.Identity;
 
             // Use clock
@@ -197,8 +207,9 @@ namespace Sharp
 
                     // Setup targets and viewport for rendering
                     context.Rasterizer.SetViewport(new Viewport(0, 0, form.ClientSize.Width, form.ClientSize.Height, 0.0f, 1.0f));
-                    context.Rasterizer.State = new RasterizerState(device, new RasterizerStateDescription {
-                        CullMode = CullMode.None,
+                    context.Rasterizer.State = new RasterizerState(device, new RasterizerStateDescription
+                    {
+                        CullMode = CullMode.Back,
                         DepthBias = 0,
                         DepthBiasClamp = 0,
                         FillMode = FillMode.Solid,
@@ -211,7 +222,7 @@ namespace Sharp
                     });
                     context.OutputMerger.SetTargets(depthView, renderView);
 
-                    
+
 
                     // Setup new projection matrix with correct aspect ratio
                     proj = Matrix.PerspectiveFovRH((float)Math.PI / 4.0f, form.ClientSize.Width / (float)form.ClientSize.Height, 0.1f, 500.0f);
@@ -229,7 +240,7 @@ namespace Sharp
                 context.ClearRenderTargetView(renderView, Color.Black);
 
                 // Update WorldViewProj Matrix
-                var world = Matrix.RotationY(time) /* Matrix.RotationY(time * 2)  Matrix.RotationZ(time * .7f)*/;
+                var world = Matrix.RotationY(time);
 
                 world.Transpose();
 
@@ -237,13 +248,15 @@ namespace Sharp
                 worldIT.Invert();
 
                 viewProj.Transpose();
-                
-                //worldViewProj.Transpose();
-                cBuffer.world = world;
-                cBuffer.worldIT = worldIT;
-                cBuffer.viewProj = viewProj;
 
-                context.UpdateSubresource(ref cBuffer, contantBuffer);
+                cBufferPerObject.world = world;
+                cBufferPerObject.worldIT = worldIT;
+
+                cBufferPerFrame.viewProj = viewProj;
+                cBufferPerFrame.eyePosition = eyePosition;
+
+                context.UpdateSubresource(ref cBufferPerFrame, constantBufferPerFrame);
+                context.UpdateSubresource(ref cBufferPerObject, constantBufferPerObject);
 
                 // Draw the cube
                 context.Draw(36, 0);
@@ -260,7 +273,8 @@ namespace Sharp
             pixelShader.Dispose();
             vertices.Dispose();
             layout.Dispose();
-            contantBuffer.Dispose();
+            constantBufferPerFrame.Dispose();
+            constantBufferPerObject.Dispose();
             depthBuffer.Dispose();
             depthView.Dispose();
             renderView.Dispose();
