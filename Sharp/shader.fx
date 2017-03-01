@@ -1,16 +1,16 @@
 ﻿struct VS_IN
 {
 	float4 pos : POSITION;
-	float4 col : COLOR;
 	float3 normal: NORMAL;
+	float2 texcoord : TEXCOORD;
 };
 
 struct PS_IN
 {
 	float4 pos : SV_POSITION;
-	float4 col : COLOR;
 	float3 normal: NORMAL;
-	float3 worldPos : TEXCOORD0;
+	float2 texcoord: TEXCOORD;
+	float3 worldPos : POSITION;
 };
 
 cbuffer CBufferPerFrame : register (b0)
@@ -32,7 +32,7 @@ PS_IN VS(VS_IN input)
 
 	output.pos = mul(mul(input.pos , world), viewProj);
 	output.normal = mul(float4(input.normal.x, input.normal.y, input.normal.z, 1.0f), worldIT).xyz;
-	output.col = input.col;
+	output.texcoord = input.texcoord;
 	output.worldPos = mul(input.pos, world).xyz;
 
 	return output;
@@ -69,6 +69,5 @@ float4 PS(PS_IN input) : SV_Target
 		specular = mul(lightSpecular * materialSpecular,si);
 	}
 
-	return input.col * (ambient + diffuse + specular);
-	return input.col;
+	return /* input.col */ (ambient + diffuse + specular);
 }

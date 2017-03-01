@@ -17,20 +17,11 @@ namespace Sharp
     /// SharpDX MiniCube Direct3D 11 Sample
     /// </summary>
     /// 
-    struct CBufferPerObject
-    {
-        public Matrix world;
-        public Matrix worldIT;
-    };
 
-    struct CBufferPerFrame
-    {
-        public Matrix viewProj;
-        public Vector4 eyePosition;
-    }
     internal static class Program
     {
         //      [STAThread]
+
         private static void Main()
         {
             var form = new RenderForm("SharpDX");
@@ -60,101 +51,15 @@ namespace Sharp
             SwapChain swapChain;
             Device.CreateWithSwapChain(DriverType.Hardware, DeviceCreationFlags.Debug, desc, out device, out swapChain);
             var context = device.ImmediateContext;
+            Game game = new Game(device);
 
             // Ignore all windows events
             var factory = swapChain.GetParent<Factory>();
             factory.MakeWindowAssociation(form.Handle, WindowAssociationFlags.IgnoreAll);
 
-            // Compile Vertex and Pixel shaders
-            var vertexShaderByteCode = ShaderBytecode.CompileFromFile("shader.fx", "VS", "vs_4_0", ShaderFlags.Debug);
-            var vertexShader = new VertexShader(device, vertexShaderByteCode);
+            game.Initialize();
 
-            var pixelShaderByteCode = ShaderBytecode.CompileFromFile("shader.fx", "PS", "ps_4_0", ShaderFlags.Debug | ShaderFlags.SkipOptimization);
-            var pixelShader = new PixelShader(device, pixelShaderByteCode);
-
-            var signature = ShaderSignature.GetInputSignature(vertexShaderByteCode);
-            // Layout from VertexShader input signature
-            var layout = new InputLayout(device, signature, new[]
-                    {
-                        new InputElement("POSITION", 0, Format.R32G32B32_Float, 0, 0),
-                        new InputElement("COLOR", 0, Format.R32G32B32_Float, 12, 0),
-                        new InputElement("NORMAL", 0, Format.R32G32B32_Float, 24, 0)
-                    });
-
-            // Instantiate Vertex buiffer from vertex data
-            var vertices = Buffer.Create(device, BindFlags.VertexBuffer, new[]
-                                  {
-                                      new Vector3(-1.0f, -1.0f, -1.0f), new Vector3(1.0f, 0.0f, 0.0f), new Vector3(0,0,-1), // Front
-                                      new Vector3(-1.0f,  1.0f, -1.0f), new Vector3(1.0f, 0.0f, 0.0f), new Vector3(0,0,-1),
-                                      new Vector3( 1.0f,  1.0f, -1.0f), new Vector3(1.0f, 0.0f, 0.0f), new Vector3(0,0,-1),
-                                      new Vector3(-1.0f, -1.0f, -1.0f), new Vector3(1.0f, 0.0f, 0.0f), new Vector3(0,0,-1),
-                                      new Vector3( 1.0f,  1.0f, -1.0f), new Vector3(1.0f, 0.0f, 0.0f), new Vector3(0,0,-1),
-                                      new Vector3( 1.0f, -1.0f, -1.0f), new Vector3(1.0f, 0.0f, 0.0f), new Vector3(0,0,-1),
-
-                                      new Vector3(-1.0f, -1.0f,  1.0f), new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0,0,1), // BACK
-                                      new Vector3( 1.0f,  1.0f,  1.0f), new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0,0,1),
-                                      new Vector3(-1.0f,  1.0f,  1.0f), new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0,0,1),
-                                      new Vector3(-1.0f, -1.0f,  1.0f), new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0,0,1),
-                                      new Vector3( 1.0f, -1.0f,  1.0f), new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0,0,1),
-                                      new Vector3( 1.0f,  1.0f,  1.0f), new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0,0,1),
-
-                                      new Vector3(-1.0f, 1.0f, -1.0f), new Vector3(0.0f, 0.0f, 1.0f), new Vector3(0,1,0), // Top
-                                      new Vector3(-1.0f, 1.0f,  1.0f), new Vector3(0.0f, 0.0f, 1.0f), new Vector3(0,1,0),
-                                      new Vector3( 1.0f, 1.0f,  1.0f), new Vector3(0.0f, 0.0f, 1.0f), new Vector3(0,1,0),
-                                      new Vector3(-1.0f, 1.0f, -1.0f), new Vector3(0.0f, 0.0f, 1.0f), new Vector3(0,1,0),
-                                      new Vector3( 1.0f, 1.0f,  1.0f), new Vector3(0.0f, 0.0f, 1.0f), new Vector3(0,1,0),
-                                      new Vector3( 1.0f, 1.0f, -1.0f), new Vector3(0.0f, 0.0f, 1.0f), new Vector3(0,1,0),
-
-                                      new Vector3(-1.0f,-1.0f, -1.0f), new Vector3(1.0f, 1.0f, 0.0f), new Vector3(0,-1,0), // Bottom
-                                      new Vector3( 1.0f,-1.0f,  1.0f), new Vector3(1.0f, 1.0f, 0.0f), new Vector3(0,-1,0),
-                                      new Vector3(-1.0f,-1.0f,  1.0f), new Vector3(1.0f, 1.0f, 0.0f), new Vector3(0,-1,0),
-                                      new Vector3(-1.0f,-1.0f, -1.0f), new Vector3(1.0f, 1.0f, 0.0f), new Vector3(0,-1,0),
-                                      new Vector3( 1.0f,-1.0f, -1.0f), new Vector3(1.0f, 1.0f, 0.0f), new Vector3(0,-1,0),
-                                      new Vector3( 1.0f,-1.0f,  1.0f), new Vector3(1.0f, 1.0f, 0.0f), new Vector3(0,-1,0),
-
-                                      new Vector3(-1.0f, -1.0f, -1.0f), new Vector3(1.0f, 0.0f, 1.0f),  new Vector3(1,0,0), // Left
-                                      new Vector3(-1.0f, -1.0f,  1.0f), new Vector3(1.0f, 0.0f, 1.0f),  new Vector3(1,0,0),
-                                      new Vector3(-1.0f,  1.0f,  1.0f), new Vector3(1.0f, 0.0f, 1.0f),  new Vector3(1,0,0),
-                                      new Vector3(-1.0f, -1.0f, -1.0f), new Vector3(1.0f, 0.0f, 1.0f),  new Vector3(1,0,0),
-                                      new Vector3(-1.0f,  1.0f,  1.0f), new Vector3(1.0f, 0.0f, 1.0f),  new Vector3(1,0,0),
-                                      new Vector3(-1.0f,  1.0f, -1.0f), new Vector3(1.0f, 0.0f, 1.0f),  new Vector3(1,0,0),
-
-                                      new Vector3( 1.0f, -1.0f, -1.0f), new Vector3(0.0f, 1.0f, 1.0f),  new Vector3(-1,0,0), // Right
-                                      new Vector3( 1.0f,  1.0f,  1.0f), new Vector3(0.0f, 1.0f, 1.0f),  new Vector3(-1,0,0),
-                                      new Vector3( 1.0f, -1.0f,  1.0f), new Vector3(0.0f, 1.0f, 1.0f),  new Vector3(-1,0,0),
-                                      new Vector3( 1.0f, -1.0f, -1.0f), new Vector3(0.0f, 1.0f, 1.0f),  new Vector3(-1,0,0),
-                                      new Vector3( 1.0f,  1.0f, -1.0f), new Vector3(0.0f, 1.0f, 1.0f),  new Vector3(-1,0,0),
-                                      new Vector3( 1.0f,  1.0f,  1.0f), new Vector3(0.0f, 1.0f, 1.0f),  new Vector3(-1,0,0),
-                            });
-
-
-
-            // Create Constant Buffers
-            var constantBufferPerFrame = new Buffer(device, Utilities.SizeOf<CBufferPerFrame>(), ResourceUsage.Default, BindFlags.ConstantBuffer, CpuAccessFlags.None, ResourceOptionFlags.None, 0);
-            CBufferPerFrame cBufferPerFrame = new CBufferPerFrame();
-
-            var constantBufferPerObject = new Buffer(device, Utilities.SizeOf<CBufferPerObject>(), ResourceUsage.Default, BindFlags.ConstantBuffer, CpuAccessFlags.None, ResourceOptionFlags.None, 0);
-            CBufferPerObject cBufferPerObject = new CBufferPerObject();
-
-            // Prepare All the stages
-            context.InputAssembler.InputLayout = layout;
-            context.InputAssembler.PrimitiveTopology = PrimitiveTopology.TriangleList;
-            context.InputAssembler.SetVertexBuffers(0, new VertexBufferBinding(vertices, Utilities.SizeOf<Vector3>() * 3, 0));
-            context.VertexShader.SetConstantBuffer(0, constantBufferPerFrame);
-            context.VertexShader.SetConstantBuffer(1, constantBufferPerObject);
-            context.VertexShader.Set(vertexShader);
-            context.PixelShader.Set(pixelShader);
-
-
-
-            // Prepare matrices
-            var eyePosition = new Vector4(0, 3, -5, 0);
-            var view = Matrix.LookAtRH(new Vector3(eyePosition.X,eyePosition.Y, eyePosition.Z), new Vector3(0, 0, 0), Vector3.UnitY);
-            Matrix proj = Matrix.Identity;
-
-            // Use clock
-            var clock = new Stopwatch();
-            clock.Start();
+            
 
             // Declare texture for rendering
             bool userResized = true;
@@ -225,56 +130,35 @@ namespace Sharp
 
 
                     // Setup new projection matrix with correct aspect ratio
-                    proj = Matrix.PerspectiveFovRH((float)Math.PI / 4.0f, form.ClientSize.Width / (float)form.ClientSize.Height, 0.1f, 500.0f);
+                    game.proj = Matrix.PerspectiveFovRH((float)Math.PI / 4.0f, form.ClientSize.Width / (float)form.ClientSize.Height, 0.1f, 500.0f);
 
                     // We are done resizing
                     userResized = false;
                 }
 
-                var time = clock.ElapsedMilliseconds / 1000.0f;
-
-                var viewProj = Matrix.Multiply(view, proj);
+                game.Update();
 
                 // Clear views
                 context.ClearDepthStencilView(depthView, DepthStencilClearFlags.Depth, 1.0f, 0);
                 context.ClearRenderTargetView(renderView, Color.Black);
-
-                // Update WorldViewProj Matrix
-                var world = Matrix.RotationY(time);
-
-                world.Transpose();
-
-                var worldIT = world;
-                worldIT.Invert();
-
-                viewProj.Transpose();
-
-                cBufferPerObject.world = world;
-                cBufferPerObject.worldIT = worldIT;
-
-                cBufferPerFrame.viewProj = viewProj;
-                cBufferPerFrame.eyePosition = eyePosition;
-
-                context.UpdateSubresource(ref cBufferPerFrame, constantBufferPerFrame);
-                context.UpdateSubresource(ref cBufferPerObject, constantBufferPerObject);
-
-                // Draw the cube
-                context.Draw(36, 0);
+                game.Render();
 
                 // Present!
                 swapChain.Present(0, PresentFlags.None);
             });
 
+            game.Clean();
+
             // Release all resources
-            signature.Dispose();
-            vertexShaderByteCode.Dispose();
-            vertexShader.Dispose();
-            pixelShaderByteCode.Dispose();
-            pixelShader.Dispose();
-            vertices.Dispose();
-            layout.Dispose();
-            constantBufferPerFrame.Dispose();
-            constantBufferPerObject.Dispose();
+            //signature.Dispose();
+            //vertexShaderByteCode.Dispose();
+            //vertexShader.Dispose();
+            //pixelShaderByteCode.Dispose();
+            //pixelShader.Dispose();
+            //vertices.Dispose();
+            //layout.Dispose();
+            //constantBufferPerFrame.Dispose();
+            //constantBufferPerObject.Dispose();
             depthBuffer.Dispose();
             depthView.Dispose();
             renderView.Dispose();
